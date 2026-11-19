@@ -1,0 +1,9 @@
+Part 1: Tokenizer
+Training Sentences
+The cat sat on the mat.
+The dog chased the cat.
+Birds fly high in the sky.
+Fish swim in the clear blue river.
+The cat sat on the wooden chair.
+I love Programming.
+Coding in python is my passion.

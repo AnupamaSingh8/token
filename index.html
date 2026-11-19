@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Pipeline Explorer - Tokenizer & Embedding Space</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0d1117; color: #c9d1d9; }
+    .card { background-color: #161b22; border-color: #30363d; }
+    .canvas-container {
+      background: radial-gradient(circle at center, rgba(56, 189, 248, 0.05) 0%, transparent 70%), #0d1117;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 font-sans">
+  <div class="max-w-6xl mx-auto space-y-5">
+
+    <!-- Header Section -->
+    <header class="card border rounded-2xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold text-sm shadow">
+            LLM
+          </span>
+          <h1 class="text-xl font-bold tracking-tight text-white">
+            LLM Pipeline Explorer: Tokenizer & Vector Embedding Space
+          </h1>
+        </div>
+        <p class="text-xs text-gray-400">
+          Trained on <code class="text-emerald-400 font-mono">file.txt</code> • Out-of-Vocabulary (OOV) Token ID = <code class="text-amber-400 font-bold">0 (&lt;UNK&gt;)</code> • Spelling vs Meaning 2D Graph
+        </p>
+      </div>
+
+      <!-- Mode Selector Switcher -->
+      <div class="flex items-center bg-gray-900 border border-gray-700 rounded-xl p-1 shadow-inner">
+        <button id="btnModeMeaning" onclick="setEmbeddingMode('meaning')" 
+                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-indigo-600 text-white shadow">
+          <span>🧠</span> Meaning-Based (Semantic)
+        </button>
+        <button id="btnModeSpelling" onclick="setEmbeddingMode('spelling')" 
+                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 text-gray-400 hover:text-white">
+          <span>🔤</span> Spelling-Based (Character)
+        </button>
+      </div>
+    </header>
+
+    <!-- Step 1 & 2: Input Box & Tokenization Section -->
+    <section class="card border rounded-2xl p-5 space-y-4 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Step 1</span>
+          <h2 class="text-sm font-bold text-white">Input Sentence (Sentence likhiye aur live Token ID dekhiye):</h2>
+        </div>
+        <span class="text-xs text-gray-400">
+          Unseen words are mapped to <span class="font-mono font-bold text-amber-400">Token ID: 0 (&lt;UNK&gt;)</span>
+        </span>
+      </div>
+
+      <div class="relative">
+        <input type="text" id="sentenceInput" 
+               value="The cat sat on the mat."
+               placeholder="Type any sentence here... (e.g., The cat loves coding in python)" 
+               class="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+               oninput="onSentenceChange(this.value)" />
+      </div>
+
+      <!-- Quick Preset Buttons -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-xs text-gray-400 font-medium">Try Presets:</span>
+        <button onclick="setSentence('The cat sat on the mat.')" class="px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 text-gray-200 text-xs transition">
+          🐱 The cat sat on the mat.
+        </button>
+        <button onclick="setSentence('The dog chased the cat.')" class="px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 text-gray-200 text-xs transition">
+          🐶 The dog chased the cat.
+        </button>
+        <button onclick="setSentence('Coding in python is my passion.')" class="px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-900 hover:bg-gray-800 text-gray-200 text-xs transition">
+          💻 Coding in python is my passion.
+        </button>
+        <button onclick="setSentence('The cat loves coding in python')" class="px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs hover:bg-amber-500/20 transition">
+          ⚠️ 'loves' OOV (ID: 0)
+        </button>
+        <button onclick="setSentence('A lion swims fast in river')" class="px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 text-xs hover:bg-rose-500/20 transition">
+          🦁 Multi-OOV Test ('lion', 'fast')
+        </button>
+      </div>
+
+      <!-- Tokenizer Output Pills -->
+      <div class="pt-3 border-t border-gray-800">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Tokenization Breakdown (<span id="tokenCount" class="text-white">6</span> tokens extracted)
+          </span>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="flex items-center gap-1.5 text-emerald-400">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> In-Vocabulary (ID: 1–27)
+            </span>
+            <span class="flex items-center gap-1.5 text-amber-400">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Out-of-Vocabulary (ID: 0 &lt;UNK&gt;)
+            </span>
+          </div>
+        </div>
+        <div id="tokensContainer" class="flex flex-wrap gap-2.5 min-h-[46px] items-center">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace Grid: 2D Graph Visualizer & Vocab Table -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      
+      <!-- Graph Canvas (8 columns) -->
+      <div class="lg:col-span-8 card border rounded-2xl p-5 flex flex-col shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-gray-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">Step 3 & 4</span>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+              2D Vector Space Embedding Graph
+            </h3>
+          </div>
+          <div id="modeDescriptionBadge" class="text-xs px-3 py-1 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            🧠 Meaning Mode: Semantic Concepts Cluster Together
+          </div>
+        </div>
+
+        <!-- Canvas Box -->
+        <div class="relative w-full rounded-xl border border-gray-800 overflow-hidden canvas-container" style="height: 420px;">
+          <canvas id="vectorCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+          
+          <div class="absolute bottom-2.5 left-2.5 flex items-center gap-2 bg-gray-900/90 backdrop-blur border border-gray-800 rounded-lg px-2.5 py-1 text-xs text-gray-400">
+            <span>🔍 Point par hover karke details dekhein</span>
+            <span class="opacity-40">•</span>
+            <span>⚡ Dashed Line shows sequence flow</span>
+          </div>
+
+          <div id="canvasTooltip" class="absolute hidden pointer-events-none z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-3 text-xs transition-opacity duration-150">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <!-- Contrast Explanation Banner -->
+        <div class="mt-4 p-3.5 rounded-xl border border-gray-800 bg-gray-950/60 text-xs space-y-1.5">
+          <div class="flex items-center justify-between font-bold">
+            <span class="text-white flex items-center gap-1.5">
+              <span>💡</span> Core NLP Insight (Spelling vs Meaning):
+            </span>
+            <span id="contrastMetric" class="font-mono text-xs text-indigo-400"></span>
+          </div>
+          <p id="contrastExplanation" class="text-xs text-gray-400 leading-relaxed">
+            <!-- Dynamic explanation -->
+          </p>
+        </div>
+      </div>
+
+      <!-- Vocab Table & Training Corpus (4 columns) -->
+      <div class="lg:col-span-4 card border rounded-2xl p-5 flex flex-col shadow-lg space-y-4">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Corpus</span>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+              Training Vocab
+            </h3>
+          </div>
+          <span class="text-xs font-mono px-2.5 py-0.5 rounded-full bg-gray-800 text-gray-300">
+            27 Words + &lt;UNK&gt;
+          </span>
+        </div>
+
+        <!-- Training sentences box -->
+        <div class="space-y-1.5">
+          <div class="text-xs text-gray-400 font-medium">Source: <code class="text-emerald-400">file.txt</code> (7 Sentences)</div>
+          <div class="text-[11px] text-gray-400 max-h-28 overflow-y-auto space-y-1 p-2.5 rounded-xl bg-gray-950 border border-gray-800 font-mono">
+            <div>1. The cat sat on the mat.</div>
+            <div>2. The dog chased the cat.</div>
+            <div>3. Birds fly high in the sky.</div>
+            <div>4. Fish swim in the clear blue river.</div>
+            <div>5. The cat sat on the wooden chair.</div>
+            <div>6. I love Programming.</div>
+            <div>7. Coding in python is my passion.</div>
+          </div>
+        </div>
+
+        <!-- Vocab Filter and Table -->
+        <div class="flex-1 flex flex-col space-y-2 min-h-0">
+          <input type="text" id="vocabSearch" placeholder="Filter vocabulary words..." 
+                 oninput="filterVocab(this.value)"
+                 class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans" />
+
+          <div class="flex-1 overflow-y-auto max-h-64 rounded-xl border border-gray-800 bg-gray-950">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="sticky top-0 bg-gray-900 border-b border-gray-800 text-[10px] uppercase text-gray-400 font-bold">
+                <tr>
+                  <th class="py-2 px-3">ID</th>
+                  <th class="py-2 px-3">Word</th>
+                  <th class="py-2 px-3">Category</th>
+                </tr>
+              </thead>
+              <tbody id="vocabTableBody" class="divide-y divide-gray-900 font-mono text-xs">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const VOCABULARY = [
+      { id: 0, word: "<UNK>", category: "Special / Out of Vocab", color: "#f59e0b" },
+      { id: 1, word: "the", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 2, word: "cat", category: "Animals", color: "#3b82f6" },
+      { id: 3, word: "sat", category: "Actions / Verbs", color: "#8b5cf6" },
+      { id: 4, word: "on", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 5, word: "mat", category: "Furniture / Objects", color: "#f59e0b" },
+      { id: 6, word: "dog", category: "Animals", color: "#3b82f6" },
+      { id: 7, word: "chased", category: "Actions / Verbs", color: "#8b5cf6" },
+      { id: 8, word: "birds", category: "Animals", color: "#3b82f6" },
+      { id: 9, word: "fly", category: "Actions / Verbs", color: "#8b5cf6" },
+      { id: 10, word: "high", category: "Nature / Environment", color: "#06b6d4" },
+      { id: 11, word: "in", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 12, word: "sky", category: "Nature / Environment", color: "#06b6d4" },
+      { id: 13, word: "fish", category: "Animals", color: "#3b82f6" },
+      { id: 14, word: "swim", category: "Actions / Verbs", color: "#8b5cf6" },
+      { id: 15, word: "clear", category: "Nature / Environment", color: "#06b6d4" },
+      { id: 16, word: "blue", category: "Nature / Environment", color: "#06b6d4" },
+      { id: 17, word: "river", category: "Nature / Environment", color: "#06b6d4" },
+      { id: 18, word: "wooden", category: "Furniture / Objects", color: "#f59e0b" },
+      { id: 19, word: "chair", category: "Furniture / Objects", color: "#f59e0b" },
+      { id: 20, word: "i", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 21, word: "love", category: "Tech / Passion", color: "#10b981" },
+      { id: 22, word: "programming", category: "Tech / Passion", color: "#10b981" },
+      { id: 23, word: "coding", category: "Tech / Passion", color: "#10b981" },
+      { id: 24, word: "python", category: "Tech / Passion", color: "#10b981" },
+      { id: 25, word: "is", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 26, word: "my", category: "Grammar / Connectors", color: "#ec4899" },
+      { id: 27, word: "passion", category: "Tech / Passion", color: "#10b981" }
+    ];
+
+    const wordToIdMap = {};
+    VOCABULARY.forEach(item => { wordToIdMap[item.word] = item.id; });
+
+    const MEANING_COORDS = {
+      "<UNK>": [0.0, 0.0],
+      "cat": [-2.25, 2.3], "dog": [-2.8, 2.85], "birds": [-3.35, 2.3], "fish": [-2.8, 1.75],
+      "sat": [-0.25, 1.4], "chased": [-0.8, 1.95], "fly": [-1.35, 1.4], "swim": [-0.8, 0.85],
+      "coding": [3.55, 2.2], "programming": [3.17, 2.72], "python": [2.55, 2.52], "love": [2.55, 1.88], "passion": [3.17, 1.68],
+      "sky": [-1.85, -2.4], "river": [-2.23, -1.88], "blue": [-2.85, -2.08], "clear": [-2.85, -2.72], "high": [-2.23, -2.92],
+      "mat": [1.15, -2.6], "chair": [0.32, -2.12], "wooden": [0.32, -3.08],
+      "the": [3.15, -1.4], "in": [2.88, -0.92], "on": [2.33, -0.92], "is": [2.05, -1.4], "i": [2.33, -1.88], "my": [2.88, -1.88]
+    };
+
+    const SPELLING_COORDS = {
+      "<UNK>": [0.0, 0.0],
+      "cat": [2.78, -0.16], "sat": [2.69, 1.91], "mat": [2.61, 1.75], "dog": [-0.14, -0.69],
+      "chair": [-1.18, -3.2], "chased": [-0.82, -2.31], "clear": [-1.01, -2.33],
+      "coding": [-0.01, -1.86], "programming": [0.77, -0.65],
+      "in": [-2.62, 0.38], "on": [-2.61, 1.52], "is": [-1.12, -0.47], "i": [-1.22, -0.17],
+      "the": [-0.33, 0.04], "birds": [-0.01, -1.14], "fly": [0.53, 0.83], "high": [0.04, -0.24],
+      "sky": [1.13, 1.71], "fish": [-0.09, -0.19], "swim": [0.77, 1.01], "blue": [0.0, -0.72],
+      "river": [0.36, -1.48], "wooden": [-1.45, 0.62], "love": [0.05, -0.77],
+      "python": [-2.44, 0.72], "my": [1.08, 1.59], "passion": [-2.23, 1.21]
+    };
+
+    let currentMode = "meaning";
+    let currentSentence = "The cat sat on the mat.";
+    let hoveredPoint = null;
+
+    const canvas = document.getElementById("vectorCanvas");
+    const ctx = canvas.getContext("2d");
+    const tooltip = document.getElementById("canvasTooltip");
+
+    function renderVocabTable(filter = "") {
+      const tbody = document.getElementById("vocabTableBody");
+      tbody.innerHTML = "";
+      const lower = filter.toLowerCase().trim();
+      VOCABULARY.forEach(item => {
+        if (lower && !item.word.toLowerCase().includes(lower) && !item.category.toLowerCase().includes(lower)) return;
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-gray-800 cursor-pointer transition";
+        tr.onclick = () => {
+          document.getElementById("sentenceInput").value = item.word;
+          onSentenceChange(item.word);
+        };
+        const isUnk = item.id === 0;
+        tr.innerHTML = `
+          <td class="py-2 px-3 ${isUnk ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}">${item.id}</td>
+          <td class="py-2 px-3 font-semibold text-white">${item.word}</td>
+          <td class="py-2 px-3 text-[11px] text-gray-400">${item.category}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterVocab(query) { renderVocabTable(query); }
+
+    function getWordBigrams(word) {
+      const w = `^${word}$`;
+      const bg = [];
+      for (let i = 0; i < w.length - 1; i++) bg.push(w.slice(i, i + 2));
+      return bg;
+    }
+
+    function projectUnknownSpellingWord(word) {
+      const testBgs = new Set(getWordBigrams(word));
+      let bestMatch = null, maxScore = -1;
+      for (const [vWord, coords] of Object.entries(SPELLING_COORDS)) {
+        if (vWord === "<UNK>") continue;
+        const vBgs = new Set(getWordBigrams(vWord));
+        let matchCount = 0;
+        testBgs.forEach(bg => { if (vBgs.has(bg)) matchCount++; });
+        const score = matchCount / Math.max(testBgs.size, vBgs.size);
+        if (score > maxScore) { maxScore = score; bestMatch = coords; }
+      }
+      if (bestMatch && maxScore > 0.2) {
+        return [+(bestMatch[0] + (Math.sin(word.length) * 0.25)).toFixed(2), +(bestMatch[1] + (Math.cos(word.length) * 0.25)).toFixed(2)];
+      }
+      return [+(Math.sin(word.length * 1.7) * 1.5).toFixed(2), +(Math.cos(word.length * 2.3) * 1.5).toFixed(2)];
+    }
+
+    function getTokenCoordinates(word, mode) {
+      const w = word.toLowerCase();
+      if (mode === "spelling") {
+        if (SPELLING_COORDS[w]) return SPELLING_COORDS[w];
+        return projectUnknownSpellingWord(w);
+      } else {
+        if (MEANING_COORDS[w]) return MEANING_COORDS[w];
+        return [0.0, 0.0];
+      }
+    }
+
+    function tokenizeText(sentence) {
+      const matches = sentence.match(/[a-zA-Z0-9_\'-]+/g) || [];
+      return matches.map((token, index) => {
+        const lower = token.toLowerCase();
+        const inVocab = lower in wordToIdMap;
+        return {
+          original: token,
+          word: lower,
+          id: inVocab ? wordToIdMap[lower] : 0,
+          isOOV: !inVocab,
+          index: index + 1
+        };
+      });
+    }
+
+    function renderTokens(tokens) {
+      const container = document.getElementById("tokensContainer");
+      document.getElementById("tokenCount").innerText = tokens.length;
+      container.innerHTML = "";
+      if (tokens.length === 0) {
+        container.innerHTML = `<span class="text-xs text-gray-500 italic">Type a sentence to inspect tokens...</span>`;
+        return;
+      }
+
+      tokens.forEach(tok => {
+        const coords = getTokenCoordinates(tok.word, currentMode);
+        const pill = document.createElement("div");
+        pill.className = `inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono border transition-all ${
+          tok.isOOV 
+            ? 'bg-amber-500/10 border-amber-500/40 text-amber-300' 
+            : 'bg-gray-900 border-gray-700 text-gray-200 hover:border-indigo-500'
+        }`;
+        pill.innerHTML = `
+          <span class="font-bold text-[10px] px-1.5 py-0.5 rounded ${tok.isOOV ? 'bg-amber-500/30 text-amber-200' : 'bg-emerald-500/20 text-emerald-300'}">
+            #${tok.index}
+          </span>
+          <span class="font-semibold text-white">${tok.word}</span>
+          <span class="text-gray-500">→</span>
+          <span class="font-bold ${tok.isOOV ? 'text-amber-400' : 'text-emerald-400'}">
+            ID: ${tok.id}
+          </span>
+          ${tok.isOOV ? '<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">OOV</span>' : ''}
+        `;
+        pill.onmouseenter = () => {
+          hoveredPoint = { word: tok.word, id: tok.id, coords, isInput: true, seq: tok.index };
+          drawCanvas();
+        };
+        pill.onmouseleave = () => { hoveredPoint = null; drawCanvas(); };
+        container.appendChild(pill);
+      });
+    }
+
+    function onSentenceChange(val) {
+      currentSentence = val;
+      const tokens = tokenizeText(currentSentence);
+      renderTokens(tokens);
+      drawCanvas();
+      updateInsightBanner();
+    }
+
+    function setSentence(val) {
+      document.getElementById("sentenceInput").value = val;
+      onSentenceChange(val);
+    }
+
+    function setEmbeddingMode(mode) {
+      currentMode = mode;
+      const btnMeaning = document.getElementById("btnModeMeaning");
+      const btnSpelling = document.getElementById("btnModeSpelling");
+      const badge = document.getElementById("modeDescriptionBadge");
+
+      if (mode === "meaning") {
+        btnMeaning.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-indigo-600 text-white shadow";
+        btnSpelling.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 text-gray-400 hover:text-white";
+        badge.className = "text-xs px-3 py-1 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        badge.innerHTML = "🧠 Meaning Mode: Semantic Concepts Cluster Together (Word2Vec Style)";
+      } else {
+        btnSpelling.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-indigo-600 text-white shadow";
+        btnMeaning.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 text-gray-400 hover:text-white";
+        badge.className = "text-xs px-3 py-1 rounded-full font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20";
+        badge.innerHTML = "🔤 Spelling Mode: Character Patterns Cluster Together (FastText Style)";
+      }
+      onSentenceChange(currentSentence);
+    }
+
+    function updateInsightBanner() {
+      const metric = document.getElementById("contrastMetric");
+      const expl = document.getElementById("contrastExplanation");
+      if (currentMode === "meaning") {
+        metric.innerText = "dist(cat, dog) = 0.79 vs dist(cat, mat) = 5.99";
+        expl.innerHTML = `
+          <strong>Meaning-Based (Semantic) Space:</strong> Yahan <em>cat</em> aur <em>dog</em> paas-paas hain kyunki dono <strong>Animals</strong> hain!
+          Lekin <em>mat</em> (furniture/floor object) dur hai chahe spelling milti julti ho. Modern LLMs isi semantic understanding ka use karte hain.
+        `;
+      } else {
+        metric.innerText = "dist(cat, mat) = 1.92 vs dist(cat, dog) = 2.97";
+        expl.innerHTML = `
+          <strong>Spelling-Based (Character) Space:</strong> Yahan <em>cat</em> aur <em>mat</em> bilkul paas hain kyunki dono ke aakhri letters <strong>"-at"</strong> hain!
+          Lekin <em>dog</em> (d-o-g) dur chala gaya kyunki spelling alag hai. Character-level tokenizers (jaise BPE) is information ko subwords me capture karte hain.
+        `;
+      }
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      drawCanvas();
+    }
+
+    function worldToScreen(wx, wy) {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      const padding = 42;
+      const minX = -4.0, maxX = 4.0, minY = -3.8, maxY = 3.8;
+      const sx = padding + ((wx - minX) / (maxX - minX)) * (w - 2 * padding);
+      const sy = padding + ((maxY - wy) / (maxY - minY)) * (h - 2 * padding);
+      return { x: sx, y: sy };
+    }
+
+    function drawCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      if (w === 0 || h === 0) return;
+
+      ctx.clearRect(0, 0, w, h);
+      const origin = worldToScreen(0, 0);
+
+      // Grid
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let x = -3; x <= 3; x += 1) {
+        if (x === 0) continue;
+        const p = worldToScreen(x, 0);
+        ctx.beginPath(); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, h); ctx.stroke();
+      }
+      for (let y = -3; y <= 3; y += 1) {
+        if (y === 0) continue;
+        const p = worldToScreen(0, y);
+        ctx.beginPath(); ctx.moveTo(0, p.y); ctx.lineTo(w, p.y); ctx.stroke();
+      }
+
+      // Axes
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(w, origin.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, h); ctx.stroke();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.font = "11px sans-serif";
+      ctx.fillText("Embedding Dim 1 (X)", w - 120, origin.y - 8);
+      ctx.fillText("Embedding Dim 2 (Y)", origin.x + 10, 18);
+
+      // Vocab Background Points
+      const currentCoords = currentMode === "meaning" ? MEANING_COORDS : SPELLING_COORDS;
+      const tokens = tokenizeText(currentSentence);
+      const inputWordSet = new Set(tokens.map(t => t.word));
+
+      VOCABULARY.forEach(item => {
+        if (item.word === "<UNK>") return;
+        const coords = currentCoords[item.word];
+        if (!coords) return;
+        const pt = worldToScreen(coords[0], coords[1]);
+        const isInput = inputWordSet.has(item.word);
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isInput ? 3 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isInput ? "rgba(100, 116, 139, 0.3)" : (item.color || "#94a3b8");
+        ctx.fill();
+
+        if (!isInput) {
+          ctx.fillStyle = "rgba(203, 213, 225, 0.7)";
+          ctx.font = "11px monospace";
+          ctx.fillText(`${item.word} [${item.id}]`, pt.x + 7, pt.y + 3);
+        }
+      });
+
+      // Input Sentence Trajectory
+      const inputPoints = tokens.map((t, idx) => {
+        const coords = getTokenCoordinates(t.word, currentMode);
+        const screenPt = worldToScreen(coords[0], coords[1]);
+        return { ...t, coords, screenPt, seq: idx + 1 };
+      });
+
+      if (inputPoints.length > 1) {
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(99, 102, 241, 0.7)";
+        ctx.lineWidth = 1.5;
+        inputPoints.forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(pt.screenPt.x, pt.screenPt.y);
+          else ctx.lineTo(pt.screenPt.x, pt.screenPt.y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Input Tokens
+      inputPoints.forEach(pt => {
+        const isOOV = pt.isOOV;
+        const mainColor = isOOV ? "#f59e0b" : "#6366f1";
+
+        ctx.beginPath();
+        ctx.arc(pt.screenPt.x, pt.screenPt.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = isOOV ? "rgba(245, 158, 11, 0.25)" : "rgba(99, 102, 241, 0.25)";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(pt.screenPt.x, pt.screenPt.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = mainColor;
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = isOOV ? "#fcd34d" : "#a5b4fc";
+        ctx.font = "bold 12px monospace";
+        ctx.fillText(`(${pt.seq}) ${pt.word} [ID: ${pt.id}]`, pt.screenPt.x + 10, pt.screenPt.y - 7);
+      });
+
+      // Hover
+      if (hoveredPoint) {
+        const hPt = worldToScreen(hoveredPoint.coords[0], hoveredPoint.coords[1]);
+        ctx.beginPath();
+        ctx.arc(hPt.x, hPt.y, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      let found = null;
+      let minDistance = 15;
+
+      const tokens = tokenizeText(currentSentence);
+      tokens.forEach((t, idx) => {
+        const coords = getTokenCoordinates(t.word, currentMode);
+        const pt = worldToScreen(coords[0], coords[1]);
+        const dist = Math.hypot(mx - pt.x, my - pt.y);
+        if (dist < minDistance) {
+          minDistance = dist;
+          found = {
+            word: t.word, id: t.id, coords, isOOV: t.isOOV, seq: idx + 1, isInput: true,
+            screenX: pt.x, screenY: pt.y
+          };
+        }
+      });
+
+      if (!found) {
+        const currentCoords = currentMode === "meaning" ? MEANING_COORDS : SPELLING_COORDS;
+        VOCABULARY.forEach(item => {
+          if (item.word === "<UNK>") return;
+          const coords = currentCoords[item.word];
+          if (!coords) return;
+          const pt = worldToScreen(coords[0], coords[1]);
+          const dist = Math.hypot(mx - pt.x, my - pt.y);
+          if (dist < minDistance) {
+            minDistance = dist;
+            found = {
+              word: item.word, id: item.id, coords, category: item.category, isInput: false,
+              screenX: pt.x, screenY: pt.y
+            };
+          }
+        });
+      }
+
+      hoveredPoint = found;
+      drawCanvas();
+
+      if (found) {
+        tooltip.classList.remove("hidden");
+        const tipX = Math.min(rect.width - 180, Math.max(10, found.screenX + 15));
+        const tipY = Math.min(rect.height - 95, Math.max(10, found.screenY - 35));
+        tooltip.style.left = `${tipX}px`;
+        tooltip.style.top = `${tipY}px`;
+
+        tooltip.innerHTML = `
+          <div class="font-bold flex items-center justify-between gap-3 text-white">
+            <span class="text-sm">${found.word}</span>
+            <span class="font-mono text-xs px-2 py-0.5 rounded ${found.id === 0 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}">
+              Token ID: ${found.id}
+            </span>
+          </div>
+          <div class="text-[11px] text-gray-400 mt-1.5 space-y-0.5 font-mono">
+            <div>Coords: (${found.coords[0]}, ${found.coords[1]})</div>
+            <div>Mode: ${currentMode.toUpperCase()}</div>
+            ${found.category ? `<div>Category: ${found.category}</div>` : ''}
+            ${found.isInput ? `<div class="text-indigo-400 font-sans font-medium">Sentence Step: #${found.seq}</div>` : ''}
+          </div>
+        `;
+      } else {
+        tooltip.classList.add("hidden");
+      }
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      hoveredPoint = null;
+      tooltip.classList.add("hidden");
+      drawCanvas();
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+    renderVocabTable();
+    resizeCanvas();
+    onSentenceChange(currentSentence);
+  </script>
+</body>
+</html>
